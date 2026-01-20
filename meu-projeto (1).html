@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Bruxo Maluco</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Press Start 2P', cursive;
+            color: white;
+            cursor: none;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+        ::-webkit-scrollbar { display: none; }
+        
+        .scanlines {
+            background: linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0),
+                rgba(255, 255, 255, 0) 50%,
+                rgba(0, 0, 0, 0.2) 50%,
+                rgba(0, 0, 0, 0.2)
+            );
+            background-size: 100% 4px;
+            position: fixed; inset: 0; pointer-events: none; z-index: 50;
+        }
+        .flicker { animation: flicker 0.15s infinite; }
+        @keyframes flicker {
+            0% { opacity: 0.97; }
+            50% { opacity: 1.0; }
+            100% { opacity: 0.98; }
+        }
+        .joystick-zone {
+            position: absolute; bottom: 20px; width: 140px; height: 140px;
+            border-radius: 50%; background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            pointer-events: auto; touch-action: none;
+        }
+        .joystick-knob {
+            width: 50px; height: 50px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.5); pointer-events: none;
+        }
+        .jump-btn {
+            position: absolute; bottom: 150px; right: 40px;
+            width: 80px; height: 80px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.4);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px; pointer-events: auto; touch-action: none;
+        }
+        .jump-btn:active { background: rgba(255, 255, 255, 0.5); }
+        .hidden { display: none !important; }
+        
+        /* Card Animations */
+        @keyframes card-enter-anim {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes card-spin-vanish {
+            0% { transform: translate(-50%, -50%) scale(1) rotateY(0deg); opacity: 1; }
+            60% { transform: translate(-50%, -50%) scale(1.5) rotateY(360deg); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(0) rotateY(720deg); opacity: 0; }
+        }
+        .card-enter { animation: card-enter-anim 0.5s ease-out forwards; }
+        .card-selected-anim {
+            position: fixed !important;
+            top: 50%; left: 50%;
+            margin: 0 !important;
+            z-index: 250 !important;
+            transform-origin: center center;
+            animation: card-spin-vanish 1.5s ease-in-out forwards;
+            box-shadow: 0 0 50px rgba(255,255,255,0.5);
+        }
+        .card-fade-out {
+            opacity: 0 !important;
+            transition: opacity 0.3s ease-out;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Custom Cursor -->
+    <div id="cursor" class="fixed top-0 left-0 z-[100] pointer-events-none hidden md:block" style="will-change: transform;">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" style="image-rendering: pixelated;">
+            <defs>
+                <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+                    <feDropShadow dx="1" dy="1" stdDeviation="0" floodColor="#000000" floodOpacity="0.5"/>
+                </filter>
+            </defs>
+            <g filter="url(#shadow)">
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M2 2V16L6 12H10L13 18L15 17L12 11H16L2 2Z" fill="white" stroke="white" stroke-width="2" stroke-linecap="square"/>
+            </g>
+        </svg>
+    </div>
+
+    <!-- CRT Overlays -->
+    <div class="scanlines"></div>
+    <div class="absolute inset-0 pointer-events-none z-50 mix-blend-overlay opacity-10 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyMDAiIGhlaWdodD0iMjAwIj48ZmlsdGVyIGlkPSJnoiPjxmZVR1cmJ1bGVuY2UgdHlwZT0iZnJhY3RhbE5vaXNlIiBiYXNlRnJlcXVlbmN5PSIwLjY1IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCUiIGhlaWdodD0iMTAwJSIgZmlsdGVyPSJ1cmwoI2cpIiBvcGFjaXR5PSIwLjUiLz48L3N2Zz4=')]"></div>
+    <div class="absolute inset-0 pointer-events-none z-40 bg-[radial-gradient(circle_at_center,transparent_0%,rgba(0,0,0,0.4)_100%)]"></div>
+
+    <!-- MENU SCREEN -->
+    <div id="menu-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-black text-white z-10 select-none">
+        <h1 class="text-4xl md:text-6xl text-center tracking-widest uppercase flicker mb-8 md:mb-16 pointer-events-none" style="text-shadow: 0 0 10px white;">
+            BRUXO<br/>MALUCO
+        </h1>
+        <div class="relative pointer-events-none">
+            <canvas id="menu-canvas" width="300" height="300" style="image-rendering: pixelated;"></canvas>
+        </div>
+        <div class="mt-12 flex flex-col gap-4 z-50">
+            <button id="btn-start" class="px-8 py-4 bg-white/10 border-2 border-white/30 text-white rounded-none animate-pulse text-sm hover:text-gray-300 hover:bg-white/20 transition-all select-none active:scale-95 uppercase tracking-wider font-bold">
+                INICIAR JOGO
+            </button>
+            <button id="btn-settings" class="px-8 py-3 bg-transparent border-2 border-gray-600 text-gray-400 rounded-none text-xs hover:text-white hover:border-white transition-all select-none active:scale-95 uppercase tracking-wider">
+                CONFIGURAÇÕES
+            </button>
+        </div>
+        <div class="mt-8 text-[10px] text-gray-500 text-center px-4">
+            PC: WASD + MOUSE | MOBILE: JOYSTICKS
+        </div>
+    </div>
+
+    <!-- SETTINGS SCREEN -->
+    <div id="settings-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-black text-white z-50 select-none hidden">
+        <div class="border-4 border-white p-8 md:p-12 flex flex-col items-center bg-black max-w-lg w-full">
+            <h1 class="text-3xl md:text-5xl text-white mb-8 tracking-widest font-bold uppercase text-center">CONFIGURAÇÕES</h1>
+            <div class="w-full flex flex-col gap-8 mb-8">
+                <div class="flex flex-col gap-2">
+                    <label id="lbl-music" class="text-sm uppercase tracking-wider font-bold">Música (50%)</label>
+                    <input id="rng-music" type="range" min="0" max="1" step="0.05" value="0.5" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-white">
+                </div>
+                <div class="flex flex-col gap-2">
+                    <label id="lbl-sfx" class="text-sm uppercase tracking-wider font-bold">Efeitos Sonoros (50%)</label>
+                    <input id="rng-sfx" type="range" min="0" max="1" step="0.05" value="0.5" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-white">
+                </div>
+            </div>
+            <button id="btn-back" class="w-full py-4 bg-white text-black border-2 border-white hover:bg-gray-200 transition-colors text-sm uppercase tracking-wider font-bold">
+                VOLTAR
+            </button>
+        </div>
+    </div>
+
+    <!-- GAME SCREEN -->
+    <div id="game-screen" class="fixed inset-0 w-full h-full bg-black flex items-center justify-center hidden">
+        <canvas id="game-canvas" width="800" height="600" class="cursor-none shadow-2xl block" style="image-rendering: pixelated;"></canvas>
+        
+        <!-- Mobile Controls -->
+        <div id="mobile-controls" class="absolute inset-0 z-[100] pointer-events-none select-none hidden">
+            <button id="btn-fullscreen" class="absolute top-4 right-4 w-10 h-10 bg-white/10 border-2 border-white/30 rounded flex items-center justify-center pointer-events-auto active:bg-white/30 z-[110]">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+            </button>
+            <div id="stick-left" class="joystick-zone" style="left: 40px; bottom: 40px;">
+                <div class="joystick-knob"></div>
+            </div>
+            <div id="stick-right" class="joystick-zone" style="right: 40px; bottom: 40px;">
+                <div class="joystick-knob"></div>
+            </div>
+            <div id="btn-jump" class="jump-btn" style="right: 40px; bottom: 200px;">PULAR</div>
+            <div id="btn-charge" class="jump-btn" style="right: 140px; bottom: 180px; width: 60px; height: 60px; font-size: 10px;">CARGA</div>
+        </div>
+
+
+
+        <!-- Level Up Screen -->
+        <div id="level-up-screen" class="absolute inset-0 flex flex-col items-center justify-center z-[200] hidden bg-black/85">
+            <div class="relative w-full h-full flex items-center justify-center">
+                <div id="cards-container" class="flex flex-col md:flex-row gap-8 p-4 mt-20 transition-all">
+                    <!-- Cards injected via JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- GAME OVER SCREEN (Moved inside Game Screen for Fullscreen support) -->
+        <div id="game-over-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-black/90 text-white z-[300] select-none hidden">
+            <div class="border-4 border-white p-12 flex flex-col items-center bg-black max-w-lg w-full relative z-[91]">
+                <h1 class="text-4xl md:text-5xl text-white mb-2 tracking-widest font-bold uppercase text-center">VOCÊ MORREU</h1>
+                <div class="w-full h-1 bg-white mb-8 flicker"></div>
+                <div class="flex flex-col gap-4 w-full">
+                    <button id="btn-retry" class="w-full py-4 bg-black border-2 border-white text-white hover:bg-white hover:text-black transition-colors text-sm uppercase tracking-wider font-bold cursor-pointer pointer-events-auto">
+                        Tentar Novamente
+                    </button>
+                    <button id="btn-menu-go" class="w-full py-4 bg-transparent border-2 border-gray-600 text-gray-400 hover:border-white hover:text-white transition-colors text-sm uppercase tracking-wider cursor-pointer pointer-events-auto">
+                        Menu Principal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const CANVAS_WIDTH = 800;
+        const CANVAS_HEIGHT = 600;
+        const GRAVITY = 0.5;
+        const JUMP_FORCE = -10;
+        const MOVE_SPEED = 4;
+        const GROUND_Y = 550;
+        const COLOR_WHITE = '#FFFFFF';
+        const WALL_WIDTH = 40;
+
+        // --- ASSETS ---
+        const ASSETS = {
+            bg: "https://i.imgur.com/Mh40r7w.png",
+            ground: "data:image/png;base64,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b3JcLzBcLzc0OTkzMDZhYTI4Y2MzMDYzODllOWMzYjA4ZjVhZGRlOTk2MTdmMjQ1NzI4Y2MzMDdjM2QyMjlmMDYwZmIxMWRfMjc0NzI1LnBuZyIsInJlcHJlc2VudGF0aXZlRnJhbWVMb2MiOi0xLCJzdGFydE1vdGlvblZpZGVvIjotMSwiZW5kTW90aW9uVmlkZW8iOi0xLCJpc01vdGlvblZpZGVvTXV0ZSI6ZmFsc2UsImlzVHJpbU1vdGlvblZpZGVvIjpmYWxzZSwiY2xpcEluZm9WYWx1ZSI6IntcIm1DZW50ZXJYXCI6MC4yNzkwNjg3MDg0MTk3OTk4LFwibUNlbnRlcllcIjowLjk2MTMwNTU1ODY4MTQ4OCxcIm1XaWR0aFwiOjAuMTE5NzA0ODEyNzY1MTIxNDYsXCJtSGVpZ2h0XCI6MC4wNzczODg2NzQwMjA3NjcyMSxcIm1Sb3RhdGlvblwiOjAsXCJtUm90YXRlXCI6MCxcIm1IRmxpcFwiOjAsXCJtVkZsaXBcIjowLFwibVJvdGF0aW9uRWZmZWN0XCI6MCxcIm1Sb3RhdGVFZmZlY3RcIjowLFwibUhGbGlwRWZmZWN0XCI6MCxcIm1WRmxpcEVmZmVjdFwiOjAsXCJtSG96UGVyc3BlY3RpdmVcIjowLFwibVZlclBlcnNwZWN0aXZlXCI6MH0iLCJ0b25lVmFsdWUiOiJ7XCJicmlnaHRuZXNzXCI6MTAwLFwiZXhwb3N1cmVcIjoxMDAsXCJjb250cmFzdFwiOjEwMCxcInNhdHVyYXRpb25cIjoxMDAsXCJodWVcIjoxMDAsXCJ3Yk1vZGVcIjotMSxcIndiVGVtcGVyYXR1cmVcIjoxMDAsXCJ0aW50XCI6MTAwLFwic2hhZG93XCI6MTAwLFwiaGlnaGxpZ2h0XCI6MTAwLFwibGlnaHRiYWxhbmNlXCI6MTAwLFwic2hhcnBuZXNzXCI6MTAwLFwiZGVmaW5pdGlvblwiOjEwMCxcImlzQnJpZ2h0bmVzc0lQRVwiOmZhbHNlLFwiaXNFeHBvc3VyZUlQRVwiOmZhbHNlLFwiaXNDb250cmFzdElQRVwiOmZhbHNlLFwiaXNTYXR1cmF0aW9uSVBFXCI6ZmFsc2V9IiwiZWZmZWN0VmFsdWUiOiJ7XCJmaWx0ZXJJbmRpY2F0aW9uXCI6NDA5NyxcImFscGhhVmFsdWVcIjoxMDAsXCJmaWx0ZXJUeXBlXCI6MH0iLCJwb3J0cmFpdEVmZmVjdFZhbHVlIjoie1wiZWZmZWN0SWRcIjotMSxcImVmZmVjdExldmVsXCI6LTEsXCJleGlmUm90YXRpb25cIjowLFwibGlnaHRMZXZlbFwiOjAsXCJ0b3VjaFhcIjowLFwidG91Y2hZXCI6MCxcInJlZm9jdXNYXCI6LTEsXCJyZWZvY3VzWVwiOi0xLFwiZWZmZWN0SWRPcmlnaW5hbFwiOi0xLFwiZWZmZWN0TGV2ZWxPcmlnaW5hbFwiOi0xLFwibGlnaHRMZXZlbE9yaWdpbmFsXCI6LTEsXCJ0b3VjaFhPcmlnaW5hbFwiOjAsXCJ0b3VjaFlPcmlnaW5hbFwiOjAsXCJyZWZvY3VzWE9yaWdpbmFsXCI6LTEsXCJyZWZvY3VzWU9yaWdpbmFsXCI6LTEsXCJ3YXRlck1hcmtSZW1vdmVkXCI6ZmFsc2UsXCJ3YXRlck1hcmtSZW1vdmVkT3JpZ2luYWxcIjpmYWxzZX0iLCJpc0JsZW5kaW5nIjp0cnVlLCJpc05vdFJlRWRpdCI6dHJ1ZSwic2VwVmVyc2lvbiI6IjE2MDAwMCIsIm5kZVZlcnNpb24iOjEsInJlU2l6ZSI6NCwiaXNTY2FsZUFJIjpmYWxzZSwicm90YXRpb24iOjEsImFkanVzdG1lbnRWYWx1ZSI6IntcIm1Dcm9wU3RhdGVcIjoxMzEwNzZ9IiwiaXNBcHBseVNoYXBlQ29ycmVjdGlvbiI6ZmFsc2UsImlzTmV3UmVFZGl0T25seSI6ZmFsc2UsImlzRGVjb1JlRWRpdE9ubHkiOmZhbHNlLCJpc0FJRmlsdGVyUmVFZGl0T25seSI6dHJ1ZX0AAKELFgAAAE9yaWdpbmFsX1BhdGhfSGFzaF9LZXkxMjM4N2NkNGExYTQ4ODM3ZjE4MjllOTIzY2FkNGEzMjUxYzMyMmZkMDRlZDVlODg1NGY5NWI1Y2I1YjFmYzlkLzI3NDcyNVNFRkhrAAAABAAAAAAAoQ2nBwAAkQAAAAAAUQwWBwAAJgAAAAAAoQvwBgAAiwYAAAAAoQtlAAAAZQAAADwAAABTRUZU",
+            player: "https://i.imgur.com/wwOpQgA.png",
+            staff: "https://i.imgur.com/ilFHqiv.png",
+            projectile: "https://i.imgur.com/f6Ng2Dh.png",
+            enemyBase: "https://i.imgur.com/e1uHmuW.png",
+            bossAttack: "https://i.imgur.com/OSreR7n.png",
+            boss2Main: "https://i.imgur.com/mSdcnLA.png",
+            boss2Idle: "https://i.imgur.com/7HNKi0B.png",
+            manaEmpty: "https://i.imgur.com/1DZTFII.png",
+            manaFill: "https://i.imgur.com/wJnrWwp.png",
+            triangle: "https://i.imgur.com/Z9bb1pT.png",
+            music: "https://pgs92212.github.io/bruxo-maluco/musica/musicafantasy.mp3",
+            sfxWalk: "https://pgs92212.github.io/bruxo-maluco/sons/andandograma.mp3",
+            sfxProjectile: "https://pgs92212.github.io/bruxo-maluco/sons/projetilsom.mp3",
+            sfxManaFull: "https://pgs92212.github.io/bruxo-maluco/sons/barradegama.mp3"
+        };
+
+        const images = {};
+        const audio = {};
+
+        // --- GAME STATE ---
+        const GameState = { MENU: 'MENU', PLAYING: 'PLAYING', SETTINGS: 'SETTINGS', GAME_OVER: 'GAME_OVER', LEVEL_UP: 'LEVEL_UP' };
+        let currentState = GameState.MENU;
+        let isTouchDevice = false;
+        let musicVolume = parseFloat(localStorage.getItem('musicVolume') || '0.5');
+        let sfxVolume = parseFloat(localStorage.getItem('sfxVolume') || '0.5');
+
+        // --- CARDS DATABASE ---
+        const CARDS_POOL = [
+            { id: 'mana_discharge', name: 'Mana Discharge', description: 'Mana cost reduced by 25%.', imageUrl: 'https://i.imgur.com/Ye9M5BR.jpeg', apply: (s) => { s.manaCost *= 0.75; } },
+            { id: 'arcane_flow', name: 'Arcane Flow', description: 'Recharge speed +40%.', imageUrl: 'https://i.imgur.com/Ye9M5BR.jpeg', apply: (s) => { s.manaChargeSpeed *= 1.4; } },
+            { id: 'deep_reserves', name: 'Deep Reserves', description: 'Max Mana +60.', imageUrl: 'https://i.imgur.com/YLCWNB5.jpeg', apply: (s) => { s.maxMana += 60; } },
+            { id: 'glass_wand', name: 'Glass Wand', description: 'Damage x2, but Max HP -1.', imageUrl: 'https://i.imgur.com/gbeZ4ro.jpeg', apply: (s) => { s.damage *= 2.0; s.maxHp = Math.max(1, s.maxHp - 1); } },
+            { id: 'stone_skin', name: 'Stone Skin', description: 'Max HP +1.', imageUrl: 'https://i.imgur.com/rQposon.jpeg', apply: (s) => { s.maxHp += 1; } },
+            { id: 'haste', name: 'Haste', description: 'Move Speed +20%.', imageUrl: 'https://i.imgur.com/eSU99VA.jpeg', apply: (s) => { s.moveSpeed *= 1.2; } },
+            { id: 'sniper', name: 'Sniper', description: 'Projectile Speed +40%, Range +.', imageUrl: 'https://i.imgur.com/IV0iIOX.jpeg', apply: (s) => { s.projectileSpeed *= 1.4; } },
+            { id: 'giant_slayer', name: 'Giant Slayer', description: 'Projectile Size +60%.', imageUrl: 'https://i.imgur.com/15p3qAa.jpeg', apply: (s) => { s.projectileSize *= 1.6; } },
+            { id: 'overcharge', name: 'Overcharge', description: 'Damage +30%, Cost +10%.', imageUrl: 'https://i.imgur.com/LhCRz8r.jpeg', apply: (s) => { s.damage *= 1.3; s.manaCost *= 1.1; } },
+            { id: 'blood_rite', name: 'Blood Rite', description: 'Vampirism: 15% chance to heal on kill.', imageUrl: 'https://i.imgur.com/jVbNsfY.jpeg', apply: (s) => { s.vampirism = Math.min(1.0, s.vampirism + 0.15); } },
+            { id: 'soul_piercer', name: 'Soul Piercer', description: 'Projectiles pierce +1 enemy.', imageUrl: 'https://i.imgur.com/LwTmPCE.jpeg', apply: (s) => { s.piercing += 1; } },
+            { id: 'feather_weight', name: 'Feather', description: 'Jump +20%, Fall Slower.', imageUrl: 'https://i.imgur.com/eSU99VA.jpeg', apply: (s) => { s.jumpForce *= 1.1; } }
+        ];
+
+        // --- ENTITIES & VARIABLES ---
+        let player = {};
+        let enemies = [];
+        let particles = [];
+        let projectiles = [];
+        let meteors = [];
+        let grass = [];
+        let bats = [];
+        let shootingStars = [];
+        
+        let wave = 1;
+        let enemiesKilledInWave = 0;
+        let enemiesToKill = 5;
+        let enemiesSpawnedInWave = 0;
+        let enemySpawnTimer = 0;
+        let enemyIdCounter = 0;
+        let hasBossSpawned = false;
+        
+        let frame = 0;
+        let screenShake = 0;
+        let warningMsg = { text: '', timer: 0 };
+        let paused = false;
+        let wasManaFull = false;
+        let waveClearTimer = 0;
+
+        // Input
+        const keys = {};
+        const mouse = { x: CANVAS_WIDTH / 2, y: CANVAS_HEIGHT / 2 };
+        const mobileInput = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, isJumping: false, isShooting: false, isCharging: false, active: false };
+
+        // Canvas
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = false;
+
+        const menuCanvas = document.getElementById('menu-canvas');
+        const menuCtx = menuCanvas.getContext('2d');
+        menuCtx.imageSmoothingEnabled = false;
+
+        // Procedural Textures
+        let groundTexture = null;
+        let wallTexture = null;
+
+        // --- INITIALIZATION ---
+        function init() {
+            // Load Images
+            for (const [key, url] of Object.entries(ASSETS)) {
+                if (key.startsWith('sfx') || key === 'music') continue;
+                const img = new Image();
+                img.src = url;
+                images[key] = img;
+            }
+
+            // Load Audio
+            audio.bgm = new Audio(ASSETS.music);
+            audio.bgm.loop = true;
+            audio.bgm.volume = musicVolume;
+
+            audio.walk = new Audio(ASSETS.sfxWalk);
+            audio.walk.loop = true;
+            
+            audio.manaFull = new Audio(ASSETS.sfxManaFull);
+
+            // Event Listeners
+            window.addEventListener('keydown', e => {
+                if (currentState === GameState.PLAYING && e.key === 'Escape') {
+                    paused = !paused;
+                    if (paused) audio.walk.pause();
+                } else if (paused && e.key.toLowerCase() === 'q') {
+                    switchState(GameState.MENU);
+                }
+                keys[e.key.toLowerCase()] = true;
+                if (e.key.toLowerCase() === 'e' && currentState === GameState.PLAYING) player.isStaffEquipped = !player.isStaffEquipped;
+            });
+            window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+            
+            window.addEventListener('mousemove', e => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                mouse.x = (e.clientX - rect.left) * scaleX;
+                mouse.y = (e.clientY - rect.top) * scaleY;
+                
+                // Custom Cursor
+                const cursor = document.getElementById('cursor');
+                if (cursor) cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
+            });
+
+            window.addEventListener('mousedown', e => {
+                if (currentState === GameState.PLAYING && !paused && !mobileInput.active && e.button === 0) {
+                    if (!player.isParalyzed && player.isStaffEquipped && !player.isAttacking && !player.isCharging && player.mana >= player.stats.manaCost) {
+                        player.isAttacking = true;
+                        player.attackFrame = 0;
+                    }
+                }
+                const cursor = document.getElementById('cursor');
+                if (cursor) cursor.classList.add('scale-90');
+            });
+
+            window.addEventListener('mouseup', () => {
+                const cursor = document.getElementById('cursor');
+                if (cursor) cursor.classList.remove('scale-90');
+            });
+
+            window.addEventListener('touchstart', () => {
+                isTouchDevice = true;
+                document.getElementById('mobile-controls').classList.remove('hidden');
+                document.getElementById('cursor').classList.add('hidden');
+            }, { once: true });
+
+            // UI Buttons
+            document.getElementById('btn-start').onclick = () => switchState(GameState.PLAYING);
+            document.getElementById('btn-settings').onclick = () => switchState(GameState.SETTINGS);
+            document.getElementById('btn-back').onclick = () => switchState(GameState.MENU);
+            document.getElementById('btn-retry').onclick = () => switchState(GameState.PLAYING);
+            document.getElementById('btn-menu-go').onclick = () => switchState(GameState.MENU);
+
+            // Settings Inputs
+            const rngMusic = document.getElementById('rng-music');
+            const rngSfx = document.getElementById('rng-sfx');
+            
+            rngMusic.oninput = (e) => {
+                musicVolume = parseFloat(e.target.value);
+                audio.bgm.volume = musicVolume;
+                localStorage.setItem('musicVolume', musicVolume);
+                document.getElementById('lbl-music').innerText = `Música (${Math.round(musicVolume * 100)}%)`;
+            };
+            
+            rngSfx.oninput = (e) => {
+                sfxVolume = parseFloat(e.target.value);
+                localStorage.setItem('sfxVolume', sfxVolume);
+                document.getElementById('lbl-sfx').innerText = `Efeitos Sonoros (${Math.round(sfxVolume * 100)}%)`;
+            };
+
+            // Mobile Controls Setup
+            setupMobileControls();
+
+            // Resize handling
+            window.addEventListener('resize', resizeGame);
+            resizeGame();
+
+            // Start Loop
+            requestAnimationFrame(loop);
+        }
+
+        function resizeGame() {
+            const aspect = CANVAS_WIDTH / CANVAS_HEIGHT;
+            const windowAspect = window.innerWidth / window.innerHeight;
+            let newWidth, newHeight;
+
+            if (windowAspect < aspect) {
+                newWidth = window.innerWidth;
+                newHeight = newWidth / aspect;
+            } else {
+                newHeight = window.innerHeight;
+                newWidth = newHeight * aspect;
+            }
+
+            canvas.style.width = `${newWidth}px`;
+            canvas.style.height = `${newHeight}px`;
+        }
+
+        function setupMobileControls() {
+            const setupStick = (zoneId, knobClass, isAim) => {
+                const zone = document.getElementById(zoneId);
+                const knob = zone.querySelector('.joystick-knob');
+                
+                const handleMove = (e) => {
+                    e.preventDefault();
+                    const touch = e.changedTouches[0];
+                    const rect = zone.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const maxDist = rect.width / 2;
+                    
+                    const dx = touch.clientX - centerX;
+                    const dy = touch.clientY - centerY;
+                    const dist = Math.sqrt(dx*dx + dy*dy);
+                    const clampedDist = Math.min(dist, maxDist);
+                    const angle = Math.atan2(dy, dx);
+                    
+                    const x = Math.cos(angle) * clampedDist;
+                    const y = Math.sin(angle) * clampedDist;
+                    
+                    knob.style.transform = `translate(${x}px, ${y}px)`;
+                    
+                    mobileInput.active = true;
+                    if (isAim) {
+                        mobileInput.aimX = x / maxDist;
+                        mobileInput.aimY = y / maxDist;
+                        mobileInput.isShooting = dist > 10;
+                        knob.style.backgroundColor = (dist > 10) ? '#ff4444' : 'rgba(255,255,255,0.5)';
+                    } else {
+                        mobileInput.moveX = x / maxDist;
+                        mobileInput.moveY = y / maxDist;
+                    }
+                };
+
+                const reset = () => {
+                    knob.style.transform = 'translate(0px, 0px)';
+                    if (isAim) {
+                        mobileInput.aimX = 0; mobileInput.aimY = 0; mobileInput.isShooting = false;
+                        knob.style.backgroundColor = 'rgba(255,255,255,0.5)';
+                    } else {
+                        mobileInput.moveX = 0; mobileInput.moveY = 0;
+                    }
+                };
+
+                zone.addEventListener('touchstart', handleMove);
+                zone.addEventListener('touchmove', handleMove);
+                zone.addEventListener('touchend', reset);
+            };
+
+            setupStick('stick-left', 'joystick-knob', false);
+            setupStick('stick-right', 'joystick-knob', true);
+
+            const btnJump = document.getElementById('btn-jump');
+            btnJump.addEventListener('touchstart', (e) => { e.preventDefault(); mobileInput.active = true; mobileInput.isJumping = true; });
+            btnJump.addEventListener('touchend', (e) => { e.preventDefault(); mobileInput.isJumping = false; });
+
+            const btnCharge = document.getElementById('btn-charge');
+            btnCharge.addEventListener('touchstart', (e) => { e.preventDefault(); mobileInput.active = true; mobileInput.isCharging = true; });
+            btnCharge.addEventListener('touchend', (e) => { e.preventDefault(); mobileInput.isCharging = false; });
+            
+            document.getElementById('btn-fullscreen').addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const gameScreen = document.getElementById('game-screen');
+                if (!document.fullscreenElement) {
+                    if (gameScreen.requestFullscreen) gameScreen.requestFullscreen();
+                    else if (gameScreen.webkitRequestFullscreen) gameScreen.webkitRequestFullscreen();
+                } else {
+                    if (document.exitFullscreen) document.exitFullscreen();
+                    else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                }
+            });
+        }
+
+        function switchState(newState) {
+            currentState = newState;
+            
+            // Hide all screens
+            ['menu-screen', 'settings-screen', 'game-screen', 'game-over-screen'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+
+            if (newState === GameState.MENU) {
+                document.getElementById('menu-screen').classList.remove('hidden');
+                audio.bgm.pause();
+                audio.bgm.currentTime = 0;
+            } else if (newState === GameState.SETTINGS) {
+                document.getElementById('settings-screen').classList.remove('hidden');
+            } else if (newState === GameState.PLAYING) {
+                document.getElementById('game-screen').classList.remove('hidden');
+                if (isTouchDevice) document.getElementById('mobile-controls').classList.remove('hidden');
+                resetGame();
+                audio.bgm.play().catch(e => console.log("Audio blocked", e));
+            } else if (newState === GameState.GAME_OVER) {
+                // Keep game-screen visible so the game-over overlay (which is a child) can be seen
+                document.getElementById('game-screen').classList.remove('hidden');
+                document.getElementById('game-over-screen').classList.remove('hidden');
+            }
+        }
+
+        function resetGame() {
+            player = {
+                x: CANVAS_WIDTH / 2, y: GROUND_Y - 48, width: 24, height: 48,
+                vy: 0, isGrounded: true, facingRight: true, walkFrame: 0,
+                isStaffEquipped: false, staffAnimState: 0, isAttacking: false, attackFrame: 0,
+                isCharging: false, mana: 100, hp: 5, hitFlashTimer: 0, invulnerabilityTimer: 0, isParalyzed: false, freezeTimer: 0,
+                stats: {
+                    moveSpeed: 4, jumpForce: -10, manaCost: 15, manaChargeSpeed: 0.3,
+                    maxMana: 100, maxHp: 5, damage: 15, projectileSpeed: 5, projectileSize: 1.0,
+                    piercing: 0, vampirism: 0
+                },
+                isBeingDrained: false
+            };
+            enemies = [];
+            particles = [];
+            projectiles = [];
+            meteors = [];
+            wave = 1;
+            enemiesKilledInWave = 0;
+            enemiesToKill = 4;
+            enemiesSpawnedInWave = 0;
+            enemySpawnTimer = 0;
+            hasBossSpawned = false;
+            paused = false;
+            
+            // Generate Textures if needed
+            if (!groundTexture) generateGroundTexture();
+            if (!wallTexture) generateWallTexture();
+            
+            // Init Grass
+            grass = [];
+            for (let x = WALL_WIDTH + 5; x < CANVAS_WIDTH - WALL_WIDTH - 5; x += Math.random() * 4 + 2) {
+                grass.push({ x, height: 8 + Math.random() * 8, lean: 0, maxLean: 10 + Math.random() * 10 });
+            }
+            
+            // Init Bats
+            bats = [];
+            for(let i=0; i<12; i++) {
+                bats.push({
+                    angle: Math.random() * Math.PI * 2,
+                    radiusX: 60 + Math.random() * 80, radiusY: 20 + Math.random() * 30,
+                    speed: (Math.random() > 0.5 ? 1 : -1) * (0.005 + Math.random() * 0.01),
+                    centerX: CANVAS_WIDTH * 0.5, centerY: CANVAS_HEIGHT * 0.35 - 100, size: 1 + Math.random() * 2
+                });
+            }
+        }
+
+        function generateGroundTexture() {
+            const h = CANVAS_HEIGHT - GROUND_Y; const w = CANVAS_WIDTH;
+            const c = document.createElement('canvas'); c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            
+            if (images.ground && images.ground.complete) {
+                // Use the provided image as a repeating pattern
+                const ptrn = ctx.createPattern(images.ground, 'repeat');
+                ctx.fillStyle = ptrn;
+                ctx.fillRect(0, 0, w, h);
+                
+                // Add a subtle top border for collision visibility
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                ctx.fillRect(0, 0, w, 2);
+            } else {
+                // Fallback if image isn't loaded yet
+                ctx.fillStyle = '#1a1a1a';
+                ctx.fillRect(0, 0, w, h);
+                ctx.fillStyle = '#FFF';
+                ctx.fillRect(0, 0, w, 2);
+            }
+            
+            groundTexture = c;
+        }
+
+        function generateWallTexture() {
+            const w = WALL_WIDTH; const h = CANVAS_HEIGHT;
+            const c = document.createElement('canvas'); c.width = w; c.height = h;
+            const ctx = c.getContext('2d');
+            ctx.fillStyle = '#000'; ctx.fillRect(0,0,w,h);
+            ctx.fillStyle = '#FFF';
+            for(let x=0; x<w; x+=10) if(Math.random()>0.5) ctx.fillRect(x,0,1,h);
+            for(let y=0; y<h; y+=32) {
+                ctx.fillRect(0,y,w,1);
+                for(let k=0; k<10; k++) ctx.fillRect(Math.random()*w, y+Math.random()*32, 1, 1);
+            }
+            ctx.fillRect(w-2,0,2,h);
+            wallTexture = c;
+        }
+
+        // --- GAME LOOP ---
+        function loop() {
+            if (currentState === GameState.MENU) {
+                renderMenu();
+            } else if (currentState === GameState.PLAYING) {
+                if (!paused) update();
+                draw();
+            }
+            requestAnimationFrame(loop);
+        }
+
+
+
+        // --- MENU RENDER ---
+        let menuRotation = 0;
+        let menuHover = 0;
+        function renderMenu() {
+            menuCtx.clearRect(0, 0, 300, 300);
+            frame++;
+            menuHover = Math.floor(Math.sin(frame * 0.05) * 6);
+            menuRotation += 0.01;
+            
+            const centerX = 150; const centerY = 150;
+            const spriteFrame = Math.floor(frame / 15) % 2;
+            
+            menuCtx.save();
+            menuCtx.translate(centerX, centerY + menuHover);
+            menuCtx.scale(Math.cos(menuRotation), 1);
+            
+            if (images.player && images.player.complete) {
+                menuCtx.drawImage(images.player, spriteFrame * 500, 0, 500, 500, -90, -90, 180, 180);
+            }
+            menuCtx.restore();
+        }
+
+        // --- UPDATE LOGIC ---
+        function update() {
+            frame++;
+            player.isBeingDrained = false;
+            if (screenShake > 0) screenShake = Math.max(0, screenShake - 1);
+            if (warningMsg.timer > 0) warningMsg.timer--;
+
+            // Spawner
+            enemySpawnTimer++;
+            // Reduced spawn rate: Slower start (280) and higher minimum cap (80)
+            const spawnRate = Math.max(80, 280 - (wave * 10));
+            if (enemySpawnTimer > spawnRate) {
+                if (enemiesSpawnedInWave < enemiesToKill && !hasBossSpawned && !enemies.some(e => e.isBoss)) {
+                    spawnEnemy();
+                    enemySpawnTimer = 0;
+                }
+            }
+
+            // Wave Clear
+            if ((enemiesSpawnedInWave >= enemiesToKill || hasBossSpawned) && enemies.length === 0) {
+                waveClearTimer++;
+                // Delay only for Boss 2 (Wave 4)
+                const clearDelay = (wave === 4) ? 60 : 0;
+                if (waveClearTimer > clearDelay) {
+                    showLevelUp();
+                    waveClearTimer = 0;
+                }
+                return;
+            } else {
+                waveClearTimer = 0;
+            }
+
+            // Player Logic
+            if (player.freezeTimer > 0) {
+                player.freezeTimer--;
+                player.isParalyzed = true;
+                warningMsg = { text: "PARALYZED!", timer: 10 };
+            } else if (!player.isBeingDrained) {
+                player.isParalyzed = false;
+            }
+
+            if (!player.isParalyzed) {
+                // Movement
+                let isMoving = false;
+                const isLeft = keys['a'] || keys['arrowleft'] || mobileInput.moveX < -0.2;
+                const isRight = keys['d'] || keys['arrowright'] || mobileInput.moveX > 0.2;
+                
+                if (isLeft) { player.x -= player.stats.moveSpeed; isMoving = true; }
+                if (isRight) { player.x += player.stats.moveSpeed; isMoving = true; }
+
+                // Facing & Staff Logic
+                const isAiming = mobileInput.active && (Math.abs(mobileInput.aimX) > 0.1 || Math.abs(mobileInput.aimY) > 0.1);
+                if (isAiming) {
+                    player.facingRight = mobileInput.aimX > 0;
+                    player.isStaffEquipped = true;
+                } else if (!isTouchDevice) {
+                    player.facingRight = mouse.x > (player.x + player.width/2);
+                    // On PC, keep staff equipped if attacking or charging, otherwise stow after delay or immediately? 
+                    // For consistency with mobile request 'soltar analogico', we stow if not active.
+                    player.isStaffEquipped = player.isAttacking || player.isCharging || keys['e']; // Keep 'E' for PC manual toggle
+                } else {
+                    // Mobile not aiming
+                    if (isMoving) player.facingRight = isRight;
+                    player.isStaffEquipped = player.isAttacking || player.isCharging;
+                }
+                
+                if (isMoving && player.isGrounded) {
+                    player.walkFrame += 0.2;
+                    spawnTrail(player.x + (isLeft ? player.width : 0), player.y + player.height);
+                } else player.walkFrame = 0;
+
+                // Jump
+                if ((keys['w'] || keys['arrowup'] || keys[' '] || mobileInput.isJumping) && player.isGrounded) {
+                    player.vy = player.stats.jumpForce;
+                    player.isGrounded = false;
+                    for(let i=0; i<5; i++) spawnTrail(player.x + player.width/2, player.y + player.height);
+                }
+
+                // Charge
+                const isCharge = keys['r'] || keys['shift'] || mobileInput.isCharging;
+                if (isCharge) {
+                    if (!player.isCharging && player.mana < player.stats.manaCost) player.isCharging = true;
+                    else if (!player.isCharging && player.mana >= player.stats.manaCost) warningMsg = { text: "USE MANA!", timer: 60 };
+                } else player.isCharging = false;
+
+                if (player.isCharging) {
+                    player.isStaffEquipped = true;
+                    if (player.mana < player.stats.maxMana) {
+                        player.mana += player.stats.manaChargeSpeed;
+                        if (player.mana >= player.stats.maxMana) {
+                            player.mana = player.stats.maxMana;
+                            if (!wasManaFull) { audio.manaFull.volume = 0.5 * sfxVolume; audio.manaFull.play().catch(()=>{}); wasManaFull = true; }
+                        } else wasManaFull = false;
+                    }
+                } else wasManaFull = false;
+
+                // Aiming
+                const isAimingMobile = mobileInput.active && (Math.abs(mobileInput.aimX) > 0.1 || Math.abs(mobileInput.aimY) > 0.1);
+                if (isAimingMobile) {
+                    mouse.x = (player.x + player.width/2) + mobileInput.aimX * 200;
+                    mouse.y = (player.y + player.height/2) + mobileInput.aimY * 200;
+                    player.isStaffEquipped = true;
+                }
+
+                // Attack
+                if (mobileInput.active && mobileInput.isShooting) {
+                    if (player.isStaffEquipped && !player.isAttacking && !player.isCharging && player.mana >= player.stats.manaCost) {
+                        player.isAttacking = true;
+                        player.attackFrame = 0;
+                    }
+                }
+
+                if (player.isAttacking) {
+                    const prev = Math.floor(player.attackFrame);
+                    player.attackFrame += 0.25;
+                    if (prev < 3 && Math.floor(player.attackFrame) === 3) {
+                        const cx = player.x + player.width/2;
+                        const cy = player.y + player.height/2;
+                        let angle = Math.atan2(mouse.y - cy, mouse.x - cx);
+                        if (isTouchDevice && !isAimingMobile) angle = player.facingRight ? 0 : Math.PI;
+                        
+                        player.mana -= player.stats.manaCost;
+                        fireProjectile(angle, cx + Math.cos(angle)*50, cy + Math.sin(angle)*50 + 10);
+                    }
+                    if (player.attackFrame >= 4) { player.isAttacking = false; player.attackFrame = 0; }
+                }
+
+                // Audio Walk
+                audio.walk.volume = 0.3 * sfxVolume;
+                if (isMoving && player.isGrounded) { if(audio.walk.paused) audio.walk.play().catch(()=>{}); }
+                else { audio.walk.pause(); audio.walk.currentTime = 0; }
+            }
+
+            // Physics
+            player.vy += GRAVITY;
+            player.y += player.vy;
+            if (player.y + player.height >= GROUND_Y) { player.y = GROUND_Y - player.height; player.vy = 0; player.isGrounded = true; }
+            else player.isGrounded = false;
+            
+            if (player.x < WALL_WIDTH) player.x = WALL_WIDTH;
+            if (player.x + player.width > CANVAS_WIDTH - WALL_WIDTH) player.x = CANVAS_WIDTH - WALL_WIDTH - player.width;
+
+            // Staff Anim
+            if (player.isStaffEquipped && player.staffAnimState < 1) player.staffAnimState = Math.min(1, player.staffAnimState + 0.15);
+            else if (!player.isStaffEquipped && player.staffAnimState > 0) player.staffAnimState = Math.max(0, player.staffAnimState - 0.15);
+
+            if (player.hitFlashTimer > 0) player.hitFlashTimer--;
+            if (player.invulnerabilityTimer > 0) player.invulnerabilityTimer--;
+
+            // Enemies
+            updateEnemies();
+            
+            // Projectiles
+            for (let i = projectiles.length - 1; i >= 0; i--) {
+                const p = projectiles[i];
+                p.x += p.vx; p.y += p.vy; p.frame += 0.5;
+                if (p.x < 0 || p.x > CANVAS_WIDTH || p.y < 0 || p.y > CANVAS_HEIGHT || !p.active) projectiles.splice(i, 1);
+            }
+
+            // Meteors & Enemy Projectiles
+            for (let i = meteors.length - 1; i >= 0; i--) {
+                const m = meteors[i];
+                m.x += m.vx; m.y += m.vy;
+                
+                if (m.isProjectile) {
+                    // Horizontal/Targeted Projectiles (e.g. Boss 2 Purple Ball)
+                    if (m.x < -100 || m.x > CANVAS_WIDTH + 100 || m.y < -100 || m.y > CANVAS_HEIGHT + 100) {
+                        meteors.splice(i, 1);
+                        continue;
+                    }
+                    // Collision with Player
+                    const dist = Math.hypot((player.x + player.width/2) - m.x, (player.y + player.height/2) - m.y);
+                    if (dist < m.size + 30 && player.invulnerabilityTimer <= 0) {
+                        takeDamage();
+                        meteors.splice(i, 1);
+                    }
+                } else {
+                    // Falling Meteors (Boss 1)
+                    if (m.y >= GROUND_Y) {
+                        screenShake = 10;
+                        if (Math.abs((player.x + player.width/2) - m.x) < 80 && player.invulnerabilityTimer <= 0) takeDamage();
+                        meteors.splice(i, 1);
+                    }
+                }
+            }
+
+            // Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx; p.y += p.vy; p.life -= 0.05;
+                if (p.life <= 0) particles.splice(i, 1);
+            }
+
+            // Grass
+            updateGrass();
+        }
+
+        function spawnEnemy() {
+            enemyIdCounter++;
+            enemiesSpawnedInWave++;
+            const isLeft = Math.random() > 0.5;
+            const hp = 30 + (wave * 8);
+            enemies.push({
+                id: enemyIdCounter, x: isLeft ? -50 : CANVAS_WIDTH + 50, y: GROUND_Y - 70,
+                width: 40, height: 70, vx: 0, hp: hp, maxHp: hp, facingRight: !isLeft,
+                state: 'WALK', walkTimer: Math.random()*100, attackFrame: 0, hitFlashTimer: 0,
+                isBoss: false, bossType: 0, bossState: 'NORMAL', bossTimer: 0, bossAnimFrame: 0
+            });
+        }
+
+        function updateEnemies() {
+            const pCx = player.x + player.width/2;
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const dist = pCx - (e.x + e.width/2);
+                if (e.hitFlashTimer > 0) e.hitFlashTimer--;
+
+                if (e.isBoss) updateBoss(e, dist);
+                else {
+                    if (Math.abs(dist) > 30) {
+                        e.state = 'WALK'; e.facingRight = dist > 0;
+                        e.x += (dist > 0 ? 1 : -1) * 0.35; e.walkTimer += 0.1;
+                    } else {
+                        e.state = 'ATTACK'; e.attackFrame += 0.1;
+                    }
+                }
+
+                // Collision Player
+                if (!player.isParalyzed && Math.abs(dist) < (player.width + e.width)/2 && Math.abs((player.y+player.height/2)-(e.y+e.height/2)) < 50) {
+                    if (player.invulnerabilityTimer <= 0) takeDamage();
+                }
+
+                // Collision Projectiles
+                for (const p of projectiles) {
+                    if (p.hitEnemies.includes(e.id)) continue;
+                    if (p.x > e.x && p.x < e.x + e.width && p.y > e.y && p.y < e.y + e.height) {
+                        if (!e.isBoss || (e.isBoss && !['TRANSFORMING_PULSE','TRANSFORMING_MORPH'].includes(e.bossState))) {
+                            e.hp -= p.damage;
+                            e.hitFlashTimer = 10;
+                            if (!e.isBoss) e.x += (p.vx > 0 ? 5 : -5);
+                            p.hitEnemies.push(e.id);
+                            spawnBlood(e.x + e.width/2, e.y + e.height/2);
+                            if (p.piercing > 0) p.piercing--; else p.active = false;
+                        }
+                        if (e.hp <= 0) {
+                            // Boss Mutation Logic
+                            const canSpawnBoss1 = wave === 2 && !hasBossSpawned;
+                            const canSpawnBoss2 = wave === 4 && !hasBossSpawned;
+                            
+                            if (!e.isBoss && (canSpawnBoss1 || canSpawnBoss2) && Math.random() < 0.5) {
+                                e.hp = 1; e.isBoss = true; hasBossSpawned = true;
+                                e.bossType = canSpawnBoss2 ? 2 : 1;
+                                e.width = 50; e.height = 100;
+                                
+                                if (e.bossType === 2) {
+                                    e.bossState = 'SPAWN_FALLING';
+                                    e.y = -400;
+                                    e.vy = 0;
+                                } else {
+                                    e.bossState = 'TRANSFORMING_PULSE';
+                                }
+                                
+                                warningMsg = { text: "MUTATION DETECTED!", timer: 180 };
+                                // Kill others safely
+                                enemies.forEach(other => {
+                                    if (other.id !== e.id) {
+                                        spawnSmoke(other.x, other.y);
+                                        enemiesKilledInWave++;
+                                    }
+                                });
+                                enemies = [e];
+                                return; // Stop processing to prevent index errors
+                            } else {
+                                if (e.isBoss && e.bossType === 2 && e.bossState !== 'DYING') {
+                                    e.bossState = 'DYING';
+                                    e.bossTimer = 0;
+                                    e.bossAnimFrame = 8; // Defeat Frame
+                                    return;
+                                }
+                                enemiesKilledInWave++;
+                                if (player.stats.vampirism > 0 && Math.random() < player.stats.vampirism && player.hp < player.stats.maxHp) player.hp++;
+                                enemies.splice(i, 1);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        function updateBoss(e, dist) {
+            // --- BOSS 1 LOGIC ---
+            if (e.bossType === 1) {
+                // Transformation Logic for Boss 1
+                if (e.bossState === 'TRANSFORMING_PULSE') {
+                    player.isParalyzed = true; e.bossTimer++;
+                    if (e.bossTimer > 120) { e.bossState = 'TRANSFORMING_MORPH'; e.bossTimer = 0; e.bossAnimFrame = 4; }
+                } else if (e.bossState === 'TRANSFORMING_MORPH') {
+                    e.bossTimer++;
+                    if (e.bossTimer % 10 === 0) { e.bossAnimFrame++; if (e.bossAnimFrame > 10) { e.bossState = 'IDLE'; e.bossTimer = 0; player.isParalyzed = false; e.hp = 100 + (wave * 25); e.maxHp = e.hp; } }
+                } else if (e.bossState === 'IDLE') {
+                    e.bossTimer++; e.facingRight = dist > 0;
+                    if (Math.abs(dist) > 40) { e.x += (dist > 0 ? 1 : -1) * 0.8; e.walkTimer += 0.2; }
+                    if (e.bossTimer > 80) {
+                        e.bossTimer = 0;
+                        const roll = Math.random();
+                        if (Math.abs(dist) < 120) { if (roll < 0.9) { e.bossState = 'ATTACK_SWORD'; e.bossAnimFrame = 0; } else { e.bossState = 'ATTACK_MANA'; e.bossAnimFrame = 4; } }
+                        else { if (roll < 0.85) { e.bossState = 'ATTACK_METEOR'; e.bossAnimFrame = 3; } else { e.bossState = 'ATTACK_MANA'; e.bossAnimFrame = 4; } }
+                    }
+                } else if (e.bossState === 'ATTACK_SWORD') {
+                    e.bossTimer++;
+                    if (e.bossTimer > 20) { e.bossAnimFrame = 1; if (Math.abs(dist) < 100 && Math.abs(player.y - e.y) < 100 && player.invulnerabilityTimer <= 0) takeDamage(); }
+                    if (e.bossTimer > 40) { e.bossState = 'IDLE'; e.bossAnimFrame = 10; e.bossTimer = 0; }
+                } else if (e.bossState === 'ATTACK_MANA') {
+                    player.isParalyzed = true; player.isBeingDrained = true; e.bossTimer++;
+                    warningMsg = { text: "MANA DRAIN!", timer: 10 };
+                    if (e.bossTimer % 5 === 0 && player.mana > 0) { player.mana = Math.max(0, player.mana - 2); spawnManaDrain(player.x + player.width/2, player.y, e.x + e.width/2, e.y); }
+                    if (e.bossTimer > 90) { player.mana = Math.max(0, player.mana - (player.stats.maxMana * 0.35)); player.isParalyzed = false; e.bossState = 'IDLE'; e.bossAnimFrame = 10; e.bossTimer = 0; }
+                } else if (e.bossState === 'ATTACK_METEOR') {
+                    e.bossTimer++;
+                    if (e.bossTimer === 30) for(let m=0; m<1; m++) meteors.push({ x: Math.random()*CANVAS_WIDTH, y: -100 - Math.random()*500, vx: (Math.random()-0.5)*2, vy: 8+Math.random()*5, size: 20+Math.random()*20 });
+                    if (e.bossTimer > 60) { e.bossState = 'IDLE'; e.bossAnimFrame = 10; e.bossTimer = 0; }
+                }
+            }
+            // --- BOSS 2 LOGIC ---
+            else if (e.bossType === 2) {
+                // SPAWN: FALLING
+                if (e.bossState === 'SPAWN_FALLING') {
+                    e.vy += 1.0; // Heavy Gravity
+                    e.y += e.vy;
+                    e.bossAnimFrame = 0; // Door Sprite
+                    
+                    // Impact
+                    if (e.y + e.height >= GROUND_Y) {
+                        e.y = GROUND_Y - e.height;
+                        e.bossState = 'TRANSFORMING_PULSE';
+                        e.bossTimer = 0;
+                        screenShake = 40; // Heavy Shake
+                        
+                        // Impact Dust
+                        for(let k=0; k<25; k++) {
+                            particles.push({ 
+                                x: e.x + e.width/2, y: e.y + e.height, 
+                                vx: (Math.random()-0.5)*12, vy: (Math.random()-1)*6, 
+                                life: 1.5, size: 4+Math.random()*6, color: '#888' 
+                            });
+                        }
+                    }
+                    return;
+                }
+
+                // DYING
+                if (e.bossState === 'DYING') {
+                    e.bossTimer++;
+                    e.bossAnimFrame = 8; // Defeat Frame (Index 8)
+                    if (e.bossTimer > 120) {
+                        enemies.splice(enemies.indexOf(e), 1);
+                        enemiesKilledInWave++;
+                    }
+                    return;
+                }
+                // Spawn: Pulse (Frame 1 -> Index 0)
+                if (e.bossState === 'TRANSFORMING_PULSE') {
+                    e.bossAnimFrame = 0; e.bossTimer++;
+                    if (e.bossTimer > 100) { e.bossState = 'TRANSFORMING_MORPH'; e.bossTimer = 0; }
+                }
+                // Spawn: Morph (Frames 1-4 -> Indices 0-3)
+                else if (e.bossState === 'TRANSFORMING_MORPH') {
+                    e.bossTimer++;
+                    if (e.bossTimer % 25 === 0) e.bossAnimFrame++;
+                    if (e.bossAnimFrame > 3) {
+                        e.bossState = 'IDLE'; e.bossTimer = 0; e.bossAnimFrame = 6; // Idle Frame 7 -> Index 6
+                        e.hp = 100 + (wave * 25); e.maxHp = e.hp; player.isParalyzed = false;
+                    }
+                }
+                // Idle (Frame 7 -> Index 6)
+                else if (e.bossState === 'IDLE') {
+                    e.bossAnimFrame = 6; e.bossTimer++; e.facingRight = dist > 0;
+                    if (Math.abs(dist) > 150) e.x += (dist > 0 ? 1 : -1) * 1.5;
+                    if (e.bossTimer > 90) {
+                        e.bossTimer = 0;
+                        const roll = Math.random();
+                        if (roll < 0.33) { e.bossState = 'ATTACK_PHYSICAL'; e.bossAnimFrame = 0; }
+                        else if (roll < 0.66) { e.bossState = 'ATTACK_PROJECTILE'; e.bossAnimFrame = 6; }
+                        else { e.bossState = 'ATTACK_MEDUSA'; e.bossAnimFrame = 4; }
+                    }
+                }
+                // Physical Attack (Separate Sheet)
+                else if (e.bossState === 'ATTACK_PHYSICAL') {
+                    e.bossTimer++;
+                    if (e.bossTimer < 30) e.x += (e.facingRight ? 1 : -1) * 4; // Slower Lunge
+                    if (e.bossTimer % 10 === 0) e.bossAnimFrame = (e.bossAnimFrame === 0) ? 1 : 0;
+                    
+                    if (Math.abs(dist) < 80 && Math.abs((player.y+player.height/2) - (e.y+e.height/2)) < 80) {
+                        if (player.invulnerabilityTimer <= 0) takeDamage();
+                    }
+                    if (e.bossTimer > 60) { e.bossState = 'IDLE'; e.bossTimer = 0; }
+                }
+                // Projectile Attack (Purple Ball: Frames 7-8 -> Indices 6-7)
+                else if (e.bossState === 'ATTACK_PROJECTILE') {
+                    e.bossTimer++;
+                    if (e.bossTimer < 40) {
+                        if (e.bossTimer % 10 === 0) e.bossAnimFrame = (e.bossAnimFrame === 6) ? 7 : 6;
+                    } else {
+                        e.bossAnimFrame = 7; // Freeze
+                        if (e.bossTimer === 50) {
+                            const angle = Math.atan2((player.y+player.height/2) - (e.y+e.height/2), (player.x+player.width/2) - (e.x+e.width/2));
+                            meteors.push({ 
+                                x: e.x + e.width/2, y: e.y + e.height/2, 
+                                vx: Math.cos(angle)*7, vy: Math.sin(angle)*7, 
+                                size: 20, color: '#A020F0', isProjectile: true 
+                            });
+                        }
+                    }
+                    if (e.bossTimer > 80) { e.bossState = 'IDLE'; e.bossTimer = 0; }
+                }
+                // Medusa Attack (Frames 5-6 -> Indices 4-5)
+                else if (e.bossState === 'ATTACK_MEDUSA') {
+                    e.bossTimer++;
+                    
+                    // Frame 4: Prep (Hand on hood), Frame 5: Attack (Face exposed)
+                    if (e.bossTimer < 40) {
+                        e.bossAnimFrame = 4;
+                    } else {
+                        e.bossAnimFrame = 5;
+                        // Paralyze if looking at boss during attack phase
+                        if (e.bossTimer < 90) {
+                            const dx = (e.x + e.width/2) - (player.x + player.width/2);
+                            const lookingAtBoss = (player.facingRight && dx > 0) || (!player.facingRight && dx < 0);
+                            if (lookingAtBoss) {
+                                player.freezeTimer = 5;
+                            }
+                        }
+                    }
+                    
+                    if (e.bossTimer > 110) { e.bossState = 'IDLE'; e.bossTimer = 0; }
+                }
+            }
+        }
+
+        function takeDamage() {
+            player.hp--;
+            player.invulnerabilityTimer = 100; // Increased from 60 to 100 frames
+            player.hitFlashTimer = 10;
+            spawnBlood(player.x + player.width/2, player.y + player.height/2);
+            if (player.hp <= 0) switchState(GameState.GAME_OVER);
+        }
+
+        function fireProjectile(angle, x, y) {
+            const sfx = new Audio(ASSETS.sfxProjectile);
+            sfx.volume = 0.25 * sfxVolume;
+            sfx.play().catch(()=>{});
+            projectiles.push({
+                x, y, vx: Math.cos(angle)*player.stats.projectileSpeed, vy: Math.sin(angle)*player.stats.projectileSpeed,
+                angle, frame: 0, active: true, damage: player.stats.damage, size: player.stats.projectileSize,
+                piercing: player.stats.piercing, hitEnemies: []
+            });
+        }
+
+        function spawnTrail(x, y) {
+            if (Math.random() > 0.5) return;
+            particles.push({ x: x + (Math.random()*20-10), y: y + (Math.random()*10-5), vx: (Math.random()-0.5)*0.5, vy: (Math.random()-0.5)*0.5, life: 1.0, size: Math.random()*2+1 });
+        }
+        function spawnBlood(x, y) {
+            for(let i=0; i<5; i++) particles.push({ x, y, vx: (Math.random()-0.5)*4, vy: (Math.random()-1)*4, life: 1.0, size: Math.random()*3+1 });
+        }
+        function spawnSmoke(x, y) {
+            for(let i=0; i<8; i++) particles.push({ x, y, vx: (Math.random()-0.5)*2, vy: -1-Math.random()*2, life: 2.0, size: 2+Math.random()*4 });
+        }
+        function spawnManaDrain(sx, sy, dx, dy) {
+            const angle = Math.atan2(dy-sy, dx-sx);
+            const speed = 4 + Math.random()*2;
+            particles.push({ x: sx, y: sy, vx: Math.cos(angle)*speed, vy: Math.sin(angle)*speed, life: 0.6, size: 3+Math.random()*2 });
+        }
+
+        function updateGrass() {
+            const pBottom = player.y + player.height;
+            const pCx = player.x + player.width/2;
+            grass.forEach(g => {
+                let target = 0;
+                const dist = Math.abs(pCx - g.x);
+                if (dist < 32 && Math.abs(pBottom - GROUND_Y) < 15) target = (pCx > g.x ? -1 : 1) * 20 * ((32-dist)/32);
+                g.lean += (target - g.lean) * 0.3;
+            });
+        }
+
+        // --- DRAWING ---
+        function draw() {
+            // Clear
+            ctx.fillStyle = '#050505';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            
+            const sx = screenShake > 0 ? (Math.random()-0.5)*screenShake : 0;
+            const sy = screenShake > 0 ? (Math.random()-0.5)*screenShake : 0;
+            ctx.save();
+            ctx.translate(sx, sy);
+
+            // BG
+            if (images.bg) { ctx.save(); ctx.globalAlpha = 0.5; ctx.drawImage(images.bg, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT); ctx.restore(); }
+            
+            // Wall
+            if (wallTexture) { ctx.drawImage(wallTexture, 0, 0); ctx.save(); ctx.translate(CANVAS_WIDTH, 0); ctx.scale(-1, 1); ctx.drawImage(wallTexture, 0, 0); ctx.restore(); }
+
+            // Enemies
+            enemies.forEach(e => drawEnemy(e));
+
+            // Ground
+            if (groundTexture) ctx.drawImage(groundTexture, 0, GROUND_Y);
+
+            // Meteors
+            ctx.fillStyle = '#8a2be2';
+            meteors.forEach(m => {
+                ctx.beginPath(); ctx.arc(m.x, m.y, m.size, 0, Math.PI*2); ctx.fill();
+            });
+
+            // Particles
+            particles.forEach(p => { 
+                ctx.fillStyle = p.color || '#FFF';
+                ctx.globalAlpha = p.life; 
+                ctx.fillRect(p.x, p.y, p.size, p.size); 
+            });
+            ctx.globalAlpha = 1.0;
+
+            // Player
+            drawPlayer();
+
+            // Projectiles
+            if (images.projectile) {
+                projectiles.forEach(p => {
+                    const scale = 0.9 * p.size;
+                    ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.angle);
+                    const frame = [2,3,4][Math.floor(p.frame)%3];
+                    ctx.drawImage(images.projectile, frame*100, 0, 100, 100, -50*scale, -50*scale, 100*scale, 100*scale);
+                    ctx.restore();
+                });
+            }
+
+            // Grass
+            ctx.strokeStyle = '#FFF'; ctx.lineWidth = 2; ctx.beginPath();
+            grass.forEach(g => {
+                ctx.moveTo(g.x, GROUND_Y); ctx.quadraticCurveTo(g.x, GROUND_Y - g.height/2, g.x + g.lean, GROUND_Y - g.height);
+            });
+            ctx.stroke();
+
+            ctx.restore();
+
+            // HUD
+            drawHUD();
+            
+            if (paused) {
+                ctx.fillStyle = 'rgba(0,0,0,0.7)'; ctx.fillRect(0,0,CANVAS_WIDTH,CANVAS_HEIGHT);
+                ctx.fillStyle = '#FFF'; ctx.font = '30px "Press Start 2P"'; ctx.textAlign = 'center';
+                ctx.fillText("PAUSED", CANVAS_WIDTH/2, CANVAS_HEIGHT/2);
+            }
+        }
+
+        function drawPlayer() {
+            if (!images.player) return;
+            const cx = player.x + player.width/2;
+            const cy = player.y + player.height;
+            const frameIdx = Math.floor(player.walkFrame) % 2;
+            
+            let angle = 0;
+            if (!isTouchDevice || (mobileInput.active && (Math.abs(mobileInput.aimX)>0.1 || Math.abs(mobileInput.aimY)>0.1))) {
+                angle = Math.atan2(mouse.y - (player.y+player.height/2), mouse.x - cx);
+            } else angle = player.facingRight ? 0 : Math.PI;
+
+            const drawStaff = (behind) => {
+                if (!images.staff) return;
+                // Logic: If stowed, only draw behind. If equipped, draw based on angle.
+                if (!player.isStaffEquipped && !player.isBeingDrained) {
+                    if (!behind) return;
+                    // Stowed (Sprite 1 / Index 0)
+                    ctx.save(); ctx.translate(cx, player.y + player.height/2);
+                    ctx.translate(player.facingRight ? -4 : 4, -5);
+                    ctx.rotate(player.facingRight ? -0.2 : 0.2);
+                    ctx.drawImage(images.staff, 0, 0, 258, 759, -11, -40, 23, 68);
+                    ctx.restore();
+                    return;
+                }
+
+                // Equipped or Drained
+                if (behind && Math.sin(angle) >= -0.5 && !player.isCharging && !player.isParalyzed && !player.isBeingDrained) return;
+                if (!behind && (Math.sin(angle) < -0.5 && !player.isCharging && !player.isParalyzed && !player.isBeingDrained)) return;
+
+                ctx.save(); ctx.translate(cx, player.y + player.height/2);
+                
+                if (player.isBeingDrained) {
+                    // Drained Animation
+                    ctx.rotate((player.facingRight ? -Math.PI/4 : -Math.PI*0.75) + Math.PI/2);
+                    const sf = 1 + Math.floor(frame/5) % 2; // Alternating Sprite 2 and 3 (Indices 1 and 2)
+                    ctx.drawImage(images.staff, sf*258, 0, 258, 759, -11, -60, 23, 68);
+                    
+                    // Spawn Purple Particles from staff head (approximate)
+                    if (Math.random() < 0.3) {
+                        const tipX = cx + (player.facingRight ? 10 : -10);
+                        const tipY = player.y - 10;
+                        particles.push({ 
+                            x: tipX, y: tipY, 
+                            vx: (Math.random()-0.5)*2, vy: -1-Math.random(), 
+                            life: 0.8, size: 2+Math.random()*3, color: '#A020F0' 
+                        });
+                    }
+                } else {
+                    // Normal Equipped
+                    if (player.isCharging || player.isParalyzed) ctx.rotate((player.facingRight ? -Math.PI/4 : -Math.PI*0.75) + Math.PI/2);
+                    else ctx.rotate(angle + Math.PI/2);
+                    const sf = player.isAttacking ? Math.min(3, Math.floor(player.attackFrame)) : (player.isCharging ? 2 + Math.floor(frame/8)%2 : 0);
+                    ctx.drawImage(images.staff, sf*258, 0, 258, 759, -11, -60, 23, 68);
+                }
+                ctx.restore();
+            };
+
+            drawStaff(true);
+            ctx.save(); ctx.translate(cx, cy);
+            if (!player.facingRight) ctx.scale(-1, 1);
+            if (player.hitFlashTimer > 0) ctx.filter = 'sepia(1) hue-rotate(-50deg) saturate(600%)';
+            if (player.isParalyzed) ctx.filter = 'hue-rotate(270deg) contrast(1.2)';
+            ctx.drawImage(images.player, frameIdx*500, 0, 500, 500, -32, -60, 64, 64);
+            ctx.restore();
+            drawStaff(false);
+        }
+
+        function drawEnemy(e) {
+            if (!images.enemyBase) return;
+            let img = images.enemyBase;
+            let fi = 0;
+            let scale = 1.0;
+            
+            if (e.isBoss) {
+                scale = 1.4;
+                if (e.bossType === 1) {
+                    if (e.bossState === 'TRANSFORMING_PULSE') { fi = 3; scale *= (1 + Math.sin(frame*0.2)*0.1); }
+                    else if (e.bossState === 'IDLE') fi = 10;
+                    else if (['TRANSFORMING_MORPH','TRANSFORMING_WAIT'].includes(e.bossState)) fi = Math.min(e.bossAnimFrame, 10);
+                    else { img = images.bossAttack; fi = e.bossAnimFrame; }
+                            } else if (e.bossType === 2) {
+                // Boss 2 Rendering
+                img = images.boss2Main;
+                fi = e.bossAnimFrame;
+                
+                if (e.bossState === 'ATTACK_PHYSICAL') {
+                    img = images.boss2Idle; // Use the separate sheet
+                }
+                
+                if (e.bossState === 'TRANSFORMING_PULSE') scale *= (1 + Math.sin(frame*0.2)*0.1);
+            }
+            } else {
+                fi = e.state === 'ATTACK' ? (Math.floor(e.attackFrame)%4 < 2 ? 1 : 2) : 0;
+            }
+            
+            const h = (e.isBoss ? 109 : 79) * scale;
+            const w = h * (500/500);
+            const yOff = e.isBoss ? 18 : 13;
+
+            ctx.save(); ctx.translate(e.x + e.width/2, e.y + e.height + yOff);
+            if (!e.facingRight) ctx.scale(-1, 1);
+            if (!e.isBoss || (e.bossType === 1 && e.bossState === 'IDLE')) ctx.rotate(e.isBoss ? 0 : Math.sin(e.walkTimer)*0.1);
+            if (e.hitFlashTimer > 0) ctx.filter = 'sepia(1) hue-rotate(-50deg) saturate(600%)';
+            
+            if (img && img.complete) ctx.drawImage(img, fi*500, 0, 500, 500, -w/2, -h, w, h);
+            ctx.restore();
+        }
+
+        function drawHUD() {
+            if (!images.manaEmpty) return;
+            const pct = player.mana / player.stats.maxMana;
+            const scale = 0.3;
+            const ew = 309 * scale; const eh = 111 * scale;
+            const fw = 258 * scale; const fh = 38 * scale;
+            const x = CANVAS_WIDTH - ew - 50; const y = CANVAS_HEIGHT - eh - 10;
+            
+            ctx.drawImage(images.manaEmpty, 0, 0, 309, 111, x, y, ew, eh);
+            if (pct > 0) ctx.drawImage(images.manaFill, 0, 0, 258*pct, 38, x + 26*scale, y + 36*scale, fw*pct, fh);
+            
+            const triFrame = Math.min(3, Math.floor(pct*4));
+            ctx.drawImage(images.triangle, triFrame*344, 0, 324, 322, x + ew + 5, y + (eh - 322*0.12)/2, 344*0.12, 322*0.12);
+
+            ctx.fillStyle = '#FFF'; ctx.font = '16px "Press Start 2P"'; ctx.textAlign = 'left';
+            ctx.fillText(`WAVE ${wave}`, 20, 30);
+            ctx.font = '10px "Press Start 2P"';
+            ctx.fillText(`KILLS: ${enemiesKilledInWave} / ${enemiesToKill}`, 20, 50);
+
+            if (warningMsg.timer > 0 && Math.floor(frame/5)%2===0) {
+                ctx.fillStyle = '#FF4444'; ctx.font = '20px "Press Start 2P"'; ctx.textAlign = 'center';
+                ctx.fillText(warningMsg.text, CANVAS_WIDTH/2, CANVAS_HEIGHT/2 - 50);
+            }
+
+            // Boss Health Bar
+            const boss = enemies.find(e => e.isBoss);
+            if (boss && boss.bossState !== 'DYING' && boss.bossState !== 'TRANSFORMING_PULSE' && boss.bossState !== 'TRANSFORMING_MORPH') {
+                const bw = 600;
+                const bh = 24;
+                const bx = (CANVAS_WIDTH - bw) / 2;
+                const by = 60;
+                
+                // Name
+                ctx.fillStyle = '#FFF';
+                ctx.font = '16px "Press Start 2P"';
+                ctx.textAlign = 'center';
+                ctx.shadowColor = 'black'; ctx.shadowBlur = 4;
+                const name = boss.bossType === 1 ? "DARK KNIGHT" : "NECROMANCER";
+                ctx.fillText(name, CANVAS_WIDTH/2, by - 15);
+                ctx.shadowBlur = 0;
+
+                // Bar Background
+                ctx.fillStyle = '#222';
+                ctx.fillRect(bx, by, bw, bh);
+                
+                // Bar Fill
+                const pct = Math.max(0, boss.hp / boss.maxHp);
+                ctx.fillStyle = '#D00';
+                ctx.fillRect(bx + 2, by + 2, (bw - 4) * pct, bh - 4);
+                
+                // Border
+                ctx.strokeStyle = '#FFF';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(bx, by, bw, bh);
+            }
+        }
+
+        // --- LEVEL UP ---
+        function showLevelUp() {
+            paused = true;
+            const container = document.getElementById('cards-container');
+            container.innerHTML = '';
+            // Add entrance animation class
+            container.className = "flex flex-col md:flex-row gap-8 p-4 mt-20 transition-all card-enter";
+            
+            const pool = [...CARDS_POOL].sort(() => 0.5 - Math.random()).slice(0, 3);
+            
+            pool.forEach(card => {
+                const btn = document.createElement('button');
+                btn.className = "w-48 h-64 border-2 border-white p-4 flex flex-col items-center justify-between hover:bg-white hover:text-black hover:scale-105 transition-all cursor-pointer bg-black relative";
+                btn.innerHTML = `
+                    <h3 class="text-sm font-bold uppercase text-center mb-4 pointer-events-none">${card.name}</h3>
+                    <div class="flex-1 w-full flex items-center justify-center overflow-hidden mb-4 pointer-events-none">
+                        <img src="${card.imageUrl}" class="object-contain w-full h-full grayscale contrast-125 pointer-events-none">
+                    </div>
+                    <p class="text-[10px] text-center opacity-80 pointer-events-none">${card.description}</p>
+                `;
+                btn.onclick = () => {
+                    // Prevent double clicks
+                    if (btn.classList.contains('card-selected-anim')) return;
+
+                    // 1. Hide other cards
+                    Array.from(container.children).forEach(child => {
+                        if (child !== btn) child.classList.add('card-fade-out');
+                    });
+
+                    // 2. Animate selected card (Center + Spin + Vanish)
+                    btn.classList.remove('hover:bg-white', 'hover:text-black', 'hover:scale-105'); // Remove hover states
+                    btn.classList.add('card-selected-anim');
+
+                    // 3. Apply stats and resume after animation
+                    setTimeout(() => {
+                        card.apply(player.stats);
+                        player.hp = player.stats.maxHp;
+                        wave++; enemiesKilledInWave = 0; enemiesSpawnedInWave = 0;
+                        enemiesToKill = 4 + (wave * 2); // Reduced scaling
+                        hasBossSpawned = false;
+                        projectiles = []; enemies = []; meteors = [];
+                        document.getElementById('level-up-screen').classList.add('hidden');
+                        paused = false;
+                    }, 1500);
+                };
+                container.appendChild(btn);
+            });
+            document.getElementById('level-up-screen').classList.remove('hidden');
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
